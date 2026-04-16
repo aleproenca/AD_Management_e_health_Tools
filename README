@@ -1,0 +1,54 @@
+# AD Management & Health Tools 🛠️
+
+Este repositório contém um conjunto de ferramentas poderosas para administradores de sistemas focadas em auditoria, diagnóstico e visualização de ambientes **Active Directory** e **Group Policy (GPO)**.
+
+## 📋 Conteúdo do Repositório
+
+### 1. HealthCheckAD_Version2.ps1 (PowerShell)
+Script de diagnóstico profundo da infraestrutura AD.
+* **O que faz:** Verifica replicação, conectividade de DCs, serviços essenciais, funções FSMO, contas inativas e senhas expiradas.
+* **Output:** Gera um relatório detalhado em **HTML** (visual), **CSV** (para processamento) e log na consola.
+
+### 2. GPO_Dashboard_Version2.ps1 (PowerShell)
+Transforma a complexidade das GPOs numa interface navegável.
+* **O que faz:** Varre todas as GPOs, OUs e links, extraindo definições de segurança, filtros WMI e configurações específicas de utilizador e computador.
+* **Output:** Gera um **Dashboard HTML interativo** e offline com filtros e pesquisa.
+
+### 3. gerar_relatorio_ad.py (Python)
+Automatização de relatórios executivos.
+* **O que faz:** Processa o CSV gerado pelo `HealthCheckAD` e converte-o num documento **Microsoft Word (.docx)** profissional.
+* **Destaque:** Inclui tabelas formatadas e gráficos estatísticos (Pizza) sobre a saúde do domínio.
+
+---
+
+## 🚀 Como Utilizar
+
+### Pré-requisitos
+* **PowerShell:** Executar como Administrador num Domain Controller ou máquina com RSAT instalado.
+* **Python 3.x:** Para o gerador de relatórios Word.
+    ```bash
+    pip install python-docx matplotlib
+    ```
+
+### Fluxo de Trabalho Sugerido
+1.  **Executar o Diagnóstico:**
+    ```powershell
+    .\HealthCheckAD_Version2.ps1
+    ```
+2.  **Gerar o Relatório Executivo (Word):**
+    ```bash
+    python gerar_relatorio_ad.py HealthCheckAD_YYYYMMDD.csv
+    ```
+3.  **Auditar GPOs:**
+    ```powershell
+    .\GPO_Dashboard_Version2.ps1
+    ```
+
+---
+
+## 📊 Visualização
+* **Saúde do AD:** Relatórios com status coloridos (OK, Aviso, Erro).
+* **Dashboard de GPOs:** Interface moderna com barra lateral para navegação entre Unidades Organizacionais.
+
+## ⚖️ Licença
+Este projeto está sob a licença MIT. Sinta-se à vontade para usar e adaptar.
