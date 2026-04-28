@@ -26,23 +26,23 @@ Automatização de relatórios executivos.
 ### Pré-requisitos
 * **PowerShell:** Executar como Administrador num Domain Controller ou máquina com RSAT instalado.
 * **Python 3.x:** Para o gerador de relatórios Word.
-    ```bash
+  bash
     pip install python-docx matplotlib
-    ```
+  
 
 ### Fluxo de Trabalho Sugerido
 1.  **Executar o Diagnóstico:**
-    ```powershell
+   powershell
     .\HealthCheckAD_Version2.ps1
-    ```
+  
 2.  **Gerar o Relatório Executivo (Word):**
-    ```bash
+   bash
     python gerar_relatorio_ad.py HealthCheckAD_YYYYMMDD.csv
-    ```
+  
 3.  **Auditar GPOs:**
-    ```powershell
+  powershell
     .\GPO_Dashboard_Version2.ps1
-    ```
+   
 
 ---
 
