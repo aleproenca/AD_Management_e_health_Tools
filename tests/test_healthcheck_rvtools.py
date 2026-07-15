@@ -10,12 +10,22 @@ import os
 import sys
 import tempfile
 import unittest
+from pathlib import Path
+
+import openpyxl
+import pandas as pd
+from docx import Document
 
 # Adicionar diretório pai ao path para importar o módulo
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from healthcheck_rvtools import (
+    carregar_abas,
+    construir_diagnostico_importacao,
     extrair_versao_linha,
+    extrair_hosts,
+    extrair_isos_montadas,
+    extrair_vms,
     normalizar_build,
     classificar_build,
     encontrar_coluna,
@@ -24,6 +34,8 @@ from healthcheck_rvtools import (
     _builds_por_linha,
     conformidade_builds_por_cluster,
     analisar_overcommit,
+    gerar_docx,
+    gerar_xlsx,
     ler_csv_rvtools,
     col_val,
 )
@@ -481,6 +493,190 @@ class TestColVal(unittest.TestCase):
         import pandas as pd
         row = pd.Series({'Name': '  host1  '})
         self.assertEqual(col_val(row, 'Name'), 'host1')
+
+
+class TestCarregarAbasRvTools(unittest.TestCase):
+
+    def _criar_arquivo(self, diretorio: str, nome: str, conteudo: str):
+        caminho = Path(diretorio) / nome
+        caminho.write_text(conteudo, encoding='utf-8')
+        return caminho
+
+    def test_carrega_abas_com_aliases_extensoes_e_case_insensitive(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            self._criar_arquivo(
+                tmpdir,
+                'RVTools_tabvHost.CSV',
+                'Host,Version,Build\nesx01,8.0,25055201\n'
+            )
+            self._criar_arquivo(
+                tmpdir,
+                'rvtools-tab-vInfo.csv',
+                'VM,Power State\nvm01,PoweredOn\n'
+            )
+            self._criar_arquivo(
+                tmpdir,
+                'RVTools_tab_vCDRom.csv.txt',
+                'VM,ISO Path,Connected\nvm01,[ds] images/win.iso,Yes\n'
+            )
+
+            abas, metadados = carregar_abas(tmpdir, retornar_metadados=True)
+
+            self.assertIn('vhost', abas)
+            self.assertIn('vinfo', abas)
+            self.assertIn('vcd', abas)
+            self.assertEqual(metadados['vhost']['arquivo'], 'RVTools_tabvHost.CSV')
+            self.assertEqual(metadados['vcd']['aba_original'].lower(), 'vcdrom')
+            self.assertEqual(len(abas['vhost']), 1)
+
+
+class TestExtracoesRvTools(unittest.TestCase):
+
+    def test_extrair_hosts_reconhece_cabecalhos_rvtools(self):
+        abas = {
+            'vhost': pd.DataFrame([{
+                'Host': 'esx01.lab.local',
+                'Cluster Name': 'Cluster-A',
+                'Product Version': 'VMware ESXi 8.0.3',
+                'Build': '25055201',
+                'Num CPU': '2',
+                'CPU Mhz': '42000',
+                'Memory Size MB': '524288',
+                'Connection State': 'connected',
+                'vCenter': 'vcsa01',
+                'Manufacturer': 'Dell',
+                'Model': 'R740',
+            }])
+        }
+
+        hosts = extrair_hosts(abas)
+
+        self.assertEqual(len(hosts), 1)
+        self.assertEqual(hosts[0]['nome'], 'esx01.lab.local')
+        self.assertEqual(hosts[0]['cluster'], 'Cluster-A')
+        self.assertEqual(hosts[0]['build'], '25055201')
+
+    def test_fallback_iso_de_vinfo_preserva_iso_path(self):
+        abas = {
+            'vinfo': pd.DataFrame([{
+                'VM': 'vm-app-01',
+                'Power State': 'PoweredOn',
+                'CD-ROM': '[datastore1] iso/windows.iso',
+            }])
+        }
+
+        vms = extrair_vms(abas)
+        isos = extrair_isos_montadas(vms, abas)
+
+        self.assertEqual(vms[0]['iso_path'], '[datastore1] iso/windows.iso')
+        self.assertEqual(len(isos), 1)
+        self.assertEqual(isos[0]['vm'], 'vm-app-01')
+
+
+class TestDiagnosticoImportacaoRelatorios(unittest.TestCase):
+
+    def _metadados(self):
+        return {
+            'vhost': {
+                'arquivo': 'RVTools_tabvHost.csv',
+                'aba_original': 'vHost',
+                'aba_normalizada': 'vhost',
+                'linhas_lidas': 1,
+                'colunas': ['Connected Hosts', 'Build'],
+                'avisos': [],
+            },
+            'vcustom': {
+                'arquivo': 'RVTools_tabvCustom.csv',
+                'aba_original': 'vCustom',
+                'aba_normalizada': 'vcustom',
+                'linhas_lidas': 1,
+                'colunas': ['Foo', 'Bar'],
+                'avisos': [],
+            },
+        }
+
+    def _dados_base(self, diagnostico, abas_brutas):
+        return {
+            'hosts': [],
+            'vms': [],
+            'clusters_oc': [],
+            'datastores': [],
+            'snapshots': [],
+            'tools': [],
+            'hw_versions': [],
+            'isos': [],
+            'builds_hosts': [],
+            'conformidade_builds': [],
+            'vc_build': {'status_build': 'DESCONHECIDO', 'versao': 'N/D'},
+            'achados': [],
+            'catalogo_revisao': 'teste',
+            'importacao': diagnostico,
+            'abas_brutas': abas_brutas,
+        }
+
+    def test_diagnostico_e_preservacao_raw_no_xlsx(self):
+        abas = {
+            'vhost': pd.DataFrame([{'Connected Hosts': '2', 'Build': '25055201'}]),
+            'vcustom': pd.DataFrame([{'Foo': 'A', 'Bar': 'B'}]),
+        }
+        diagnostico, abas_brutas = construir_diagnostico_importacao(
+            abas,
+            self._metadados(),
+            {
+                'hosts': [],
+                'vms': [],
+                'clusters_oc': [],
+                'datastores': [],
+                'snapshots': [],
+                'tools': [],
+                'isos': [],
+                'vc_build': {'status_build': 'DESCONHECIDO', 'versao': 'N/D'},
+            }
+        )
+
+        status_por_aba = {item['aba']: item['status'] for item in diagnostico}
+        self.assertEqual(status_por_aba['vhost'], 'MAPEAMENTO_PARCIAL')
+        self.assertEqual(status_por_aba['vcustom'], 'SEM_EXTRAÇÃO')
+        self.assertTrue(any(item['nome'] == 'RAW_vHost' for item in abas_brutas))
+        self.assertTrue(any(item['nome'] == 'RAW_vcustom' for item in abas_brutas))
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            caminho = os.path.join(tmpdir, 'relatorio.xlsx')
+            gerar_xlsx(self._dados_base(diagnostico, abas_brutas), caminho)
+            wb = openpyxl.load_workbook(caminho)
+
+            self.assertIn('Diagnostico_Importacao', wb.sheetnames)
+            self.assertIn('RAW_vHost', wb.sheetnames)
+            self.assertIn('RAW_vcustom', wb.sheetnames)
+            self.assertEqual(wb['RAW_vHost']['A1'].value, 'Connected Hosts')
+            self.assertEqual(wb['RAW_vcustom']['A2'].value, 'A')
+
+    def test_docx_explica_falha_de_mapeamento_de_hosts(self):
+        abas = {'vhost': pd.DataFrame([{'Connected Hosts': '2', 'Build': '25055201'}])}
+        diagnostico, abas_brutas = construir_diagnostico_importacao(
+            abas,
+            {'vhost': self._metadados()['vhost']},
+            {
+                'hosts': [],
+                'vms': [],
+                'clusters_oc': [],
+                'datastores': [],
+                'snapshots': [],
+                'tools': [],
+                'isos': [],
+                'vc_build': {'status_build': 'DESCONHECIDO', 'versao': 'N/D'},
+            }
+        )
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            caminho = os.path.join(tmpdir, 'relatorio.docx')
+            gerar_docx(self._dados_base(diagnostico, abas_brutas), {'_metadata': {}}, caminho)
+            doc = Document(caminho)
+            texto = '\n'.join(p.text for p in doc.paragraphs if p.text)
+
+            self.assertIn('RVTools_tabvHost.csv', texto)
+            self.assertIn('colunas não reconhecidas', texto)
+            self.assertIn('Colunas encontradas: Connected Hosts, Build', texto)
 
 
 if __name__ == '__main__':
