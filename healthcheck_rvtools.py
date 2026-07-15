@@ -14,7 +14,6 @@
 # ============================================================
 
 import csv
-import glob
 import json
 import os
 import re
@@ -182,33 +181,103 @@ def ler_csv_rvtools(caminho: str) -> pd.DataFrame:
         return pd.DataFrame()
 
 
-def carregar_abas(diretorio: str) -> dict:
+_ALIASES_ABAS_RVTOOLS = {
+    'vhost': 'vhost',
+    'host': 'vhost',
+    'hosts': 'vhost',
+    'vhosts': 'vhost',
+    'vinfo': 'vinfo',
+    'info': 'vinfo',
+    'vcluster': 'vcluster',
+    'cluster': 'vcluster',
+    'clusters': 'vcluster',
+    'vdatastore': 'vdatastore',
+    'datastore': 'vdatastore',
+    'datastores': 'vdatastore',
+    'vsnapshot': 'vsnapshot',
+    'snapshot': 'vsnapshot',
+    'snapshots': 'vsnapshot',
+    'vtools': 'vtools',
+    'tool': 'vtools',
+    'tools': 'vtools',
+    'vcd': 'vcd',
+    'vcdrom': 'vcd',
+    'vcdroms': 'vcd',
+    'vmetadata': 'vmetadata',
+    'metadata': 'vmetadata',
+    'vsource': 'vsource',
+    'source': 'vsource',
+    'vhealth': 'vhealth',
+    'health': 'vhealth',
+}
+
+
+def _extrair_nome_aba_arquivo(nome_arquivo: str) -> str | None:
+    """Extrai o nome da aba RVTools a partir do nome do arquivo."""
+    match = re.match(r'(?i)^rvtools[\s._-]*tab[\s._-]*(.+?)(\.[^.]+)+$', nome_arquivo)
+    if not match:
+        return None
+    return match.group(1).strip()
+
+
+def _normalizar_chave_aba(nome_aba: str) -> str:
+    """Normaliza nomes de abas RVTools para chaves canônicas conhecidas."""
+    chave = re.sub(r'[^a-z0-9]+', '', str(nome_aba).lower())
+    return _ALIASES_ABAS_RVTOOLS.get(chave, chave)
+
+
+def carregar_abas(diretorio: str, retornar_metadados: bool = False) -> dict | tuple[dict, dict]:
     """
-    Carrega todos os arquivos RVTools_tab*.csv do diretório especificado.
-    Retorna dicionário {nome_aba_lower: DataFrame}.
-    Ex: {'vhost': df, 'vinfo': df, 'vcluster': df, ...}
+    Carrega arquivos RVTools_tab* do diretório especificado.
+    Normaliza chaves de abas com tolerância a maiúsculas/minúsculas,
+    separadores e extensões variantes.
     """
     abas = {}
-    padrao = os.path.join(diretorio, 'RVTools_tab*.csv')
-    arquivos = glob.glob(padrao)
+    metadados = {}
+    arquivos = []
+
+    for nome in sorted(os.listdir(diretorio)):
+        caminho = os.path.join(diretorio, nome)
+        if not os.path.isfile(caminho):
+            continue
+        if _extrair_nome_aba_arquivo(nome) is not None:
+            arquivos.append(caminho)
 
     if not arquivos:
         print(f"AVISO: Nenhum arquivo RVTools_tab*.csv encontrado em '{diretorio}'")
-        return abas
+        return (abas, metadados) if retornar_metadados else abas
 
     for caminho in sorted(arquivos):
-        nome_arquivo = Path(caminho).stem  # ex: RVTools_tabvHost
-        # Extrair nome da aba: remover prefixo 'RVTools_tab' (case-insensitive)
-        nome_aba = re.sub(r'^RVTools_tab', '', nome_arquivo, flags=re.IGNORECASE)
-        chave = nome_aba.lower()
+        nome_arquivo = Path(caminho).name
+        nome_aba = _extrair_nome_aba_arquivo(nome_arquivo)
+        if nome_aba is None:
+            continue
+        chave = _normalizar_chave_aba(nome_aba)
         df = ler_csv_rvtools(caminho)
-        if not df.empty:
-            abas[chave] = df
-            print(f"  Carregado: {Path(caminho).name} ({len(df)} linhas, aba='{chave}')")
-        else:
-            print(f"  AVISO: {Path(caminho).name} vazio ou com erro.")
+        avisos = []
+        if chave in metadados:
+            avisos.append(
+                f"Outra exportação normalizada para '{chave}' já havia sido carregada; "
+                "os dados mais recentes substituíram os anteriores."
+            )
+        if df.empty:
+            avisos.append('Arquivo carregado sem linhas válidas ou com erro de leitura.')
 
-    return abas
+        abas[chave] = df
+        metadados[chave] = {
+            'arquivo': nome_arquivo,
+            'aba_original': nome_aba,
+            'aba_normalizada': chave,
+            'linhas_lidas': int(len(df.index)),
+            'colunas': [str(c) for c in df.columns],
+            'avisos': avisos,
+        }
+        if df.empty:
+            print(f"  Carregado: {nome_arquivo} (0 linhas, aba='{chave}')")
+        else:
+            print(f"  Carregado: {nome_arquivo} ({len(df)} linhas, aba='{chave}')")
+
+    return (abas, metadados) if retornar_metadados else abas
 
 
 # ============================================================
@@ -227,23 +296,66 @@ def _normalizar_nome_col(nome: str) -> str:
     return nome
 
 
+def _compactar_nome_col(nome: str) -> str:
+    """Remove separadores para comparar variantes compactas de cabeçalhos."""
+    return re.sub(r'[^a-z0-9]+', '', _normalizar_nome_col(nome))
+
+
 def encontrar_coluna(colunas: list, candidatos: list, obrigatorio: bool = False) -> str | None:
     """
     Busca a melhor coluna correspondente entre os candidatos dados.
-    Usa correspondência normalizada e parcial.
+    Usa correspondência normalizada priorizando matches exatos e
+    evitando associações parciais ambíguas.
     Retorna o nome original da coluna ou None se não encontrado.
     """
-    cols_norm = {_normalizar_nome_col(c): c for c in colunas}
+    detalhes = []
+    for col in colunas:
+        norm = _normalizar_nome_col(col)
+        detalhes.append({
+            'original': col,
+            'normalizado': norm,
+            'compacto': _compactar_nome_col(col),
+            'tokens': set(norm.split()),
+        })
 
     for cand in candidatos:
         cand_norm = _normalizar_nome_col(cand)
-        # Correspondência exata (normalizada)
-        if cand_norm in cols_norm:
-            return cols_norm[cand_norm]
-        # Correspondência parcial — o candidato está contido no nome da coluna
-        for norm, orig in cols_norm.items():
-            if cand_norm in norm or norm in cand_norm:
-                return orig
+        cand_compacto = _compactar_nome_col(cand)
+
+        exatas = [
+            item['original'] for item in detalhes
+            if item['normalizado'] == cand_norm or item['compacto'] == cand_compacto
+        ]
+        if exatas:
+            return exatas[0]
+
+    for cand in candidatos:
+        cand_norm = _normalizar_nome_col(cand)
+        if ' ' in cand_norm:
+            token_matches = [
+                item['original'] for item in detalhes
+                if cand_norm and
+                re.search(rf'(^| ){re.escape(cand_norm)}($| )', item['normalizado'])
+            ]
+        else:
+            token_matches = [
+                item['original'] for item in detalhes
+                if cand_norm and item['normalizado'].split()[-1:] == [cand_norm]
+            ]
+        if len(token_matches) == 1:
+            return token_matches[0]
+        if len(token_matches) > 1:
+            continue
+
+        frase_matches = [
+            item['original'] for item in detalhes
+            if cand_norm and ' ' in cand_norm and
+            re.search(rf'(^| ){re.escape(cand_norm)}($| )', item['normalizado'])
+        ]
+        if len(frase_matches) == 1:
+            return frase_matches[0]
+        if len(frase_matches) > 1:
+            continue
 
     if obrigatorio:
         raise KeyError(f"Coluna obrigatória não encontrada. Candidatos: {candidatos}")
@@ -427,6 +539,27 @@ def _escrever_aba_xlsx(wb, nome_aba: str, colunas: list, linhas: list):
     return ws
 
 
+def _nome_unico_aba_xlsx(wb, nome_base: str) -> str:
+    """Gera nome de aba único respeitando o limite de 31 caracteres do Excel."""
+    nome_base = nome_base[:31]
+    if nome_base not in wb.sheetnames:
+        return nome_base
+    idx = 2
+    while True:
+        sufixo = f"_{idx}"
+        candidato = f"{nome_base[:31-len(sufixo)]}{sufixo}"
+        if candidato not in wb.sheetnames:
+            return candidato
+        idx += 1
+
+
+def _escrever_dataframe_xlsx(wb, nome_aba: str, df: pd.DataFrame):
+    """Preserva um DataFrame bruto em aba própria do XLSX."""
+    colunas = [str(c) for c in df.columns]
+    linhas = df.fillna('').astype(str).values.tolist()
+    return _escrever_aba_xlsx(wb, _nome_unico_aba_xlsx(wb, nome_aba), colunas, linhas)
+
+
 # ============================================================
 # VALIDAÇÃO DE BUILDS
 # ============================================================
@@ -593,34 +726,34 @@ def classificar_build(versao_str: str, build_str: str,
 # — Mapeamentos de colunas candidatas por aba —
 
 _COLS_HOST = {
-    'nome':     ['Name', 'Host', 'DNS Name', 'Hostname'],
+    'nome':     ['Name', 'Host', 'Host Name', 'DNS Name', 'Hostname', 'HostName'],
     'cluster':  ['Cluster', 'Cluster Name'],
-    'versao':   ['Version', 'ESXi Version', 'Product Version'],
+    'versao':   ['Version', 'ESXi Version', 'Product Version', 'Product version'],
     'build':    ['Build', 'Build Number', 'Build number'],
-    'cpu_mhz':  ['CPU Mhz', 'CPU MHz', 'Total CPU MHz', 'CPU usage MHz'],
-    'cpu_count':['# CPU', 'NumCPU', 'CPU Cores', 'Num CPU'],
-    'mem_mb':   ['Memory Size MB', 'Total Memory MB', 'Memory MB'],
-    'conexao':  ['Connection State', 'State', 'Status'],
+    'cpu_mhz':  ['CPU Mhz', 'CPU MHz', 'Total CPU MHz', 'CPU usage MHz', 'CPU Usage MHz', 'CPUUsage'],
+    'cpu_count':['# CPU', 'NumCPU', 'CPU Cores', 'CPU Cores', 'Num CPU', 'numCpuPackages', 'numCpuCores'],
+    'mem_mb':   ['Memory Size MB', 'Total Memory MB', 'Memory MB', 'Memory Total MB', 'MemoryTotal'],
+    'conexao':  ['Connection State', 'connectionState', 'State', 'Status'],
     'vcenter':  ['vCenter', 'vCenter Server'],
     'modelo':   ['Model', 'Host Model'],
-    'fabricante':['Manufacturer'],
+    'fabricante':['Manufacturer', 'Vendor'],
 }
 
 _COLS_VM = {
-    'nome':     ['VM', 'Name', 'VM Name'],
-    'power':    ['Power State', 'Power', 'Powerstate'],
+    'nome':     ['VM', 'Name', 'VM Name', 'VMName'],
+    'power':    ['Power State', 'Power', 'Powerstate', 'powerState'],
     'template': ['Template'],
     'cluster':  ['Cluster', 'Cluster Name'],
     'host':     ['VMware-Host', 'Host', 'ESXi Host'],
     'vcenter':  ['vCenter', 'vCenter Server'],
-    'cpu':      ['CPUs', 'NumCPU', '# CPU', 'Num CPU'],
-    'mem_mb':   ['Memory MB', 'Memory Size MB', 'MemoryMB'],
+    'cpu':      ['CPUs', 'NumCPU', '# CPU', 'Num CPU', 'numCPU', 'CPU'],
+    'mem_mb':   ['Memory MB', 'Memory Size MB', 'MemoryMB', 'memoryMB', 'Memory'],
     'hw_version':['Hardware Version', 'HW version', 'VM Version'],
     'os':       ['OS according to the VMware Tools',
                   'OS According to the configuration file',
                   'Guest OS', 'OS', 'OS full name'],
-    'tools_status':  ['VMware Tools Status', 'Tools Status', 'Tools Running Status'],
-    'tools_version': ['VMware Tools Version', 'Tools Version'],
+    'tools_status':  ['VMware Tools Status', 'Tools Status', 'Tools Running Status', 'toolsStatus'],
+    'tools_version': ['VMware Tools Version', 'Tools Version', 'toolsVersion'],
     'iso':      ['CD-ROM', 'CD/DVD', 'ISO', 'Connected ISO', 'CD path'],
     'folder':   ['Folder', 'VM Folder'],
 }
@@ -676,6 +809,190 @@ _COLS_META = {
     'fonte':    ['Source'],
 }
 
+_COLS_CD = {
+    'vm':        ['VM', 'Name', 'VM Name'],
+    'iso_path':  ['ISO Path', 'ISO', 'CD path', 'Backing', 'File name', 'Filename'],
+    'conectada': ['Connected', 'Connection', 'Status'],
+}
+
+_CONFIG_IMPORTACAO = {
+    'vinfo': {
+        'destino': 'Inventario_VMs',
+        'resultado': 'vms',
+        'mapa': _COLS_VM,
+        'obrigatorios': ['nome'],
+        'sheet_raw': 'RAW_vInfo',
+    },
+    'vhost': {
+        'destino': 'Hosts',
+        'resultado': 'hosts',
+        'mapa': _COLS_HOST,
+        'obrigatorios': ['nome'],
+        'sheet_raw': 'RAW_vHost',
+    },
+    'vcluster': {
+        'destino': 'Clusters_Overcommit',
+        'resultado': 'clusters_oc',
+        'mapa': _COLS_CLUSTER,
+        'obrigatorios': ['nome'],
+        'sheet_raw': 'RAW_vCluster',
+    },
+    'vdatastore': {
+        'destino': 'Datastores',
+        'resultado': 'datastores',
+        'mapa': _COLS_DS,
+        'obrigatorios': ['nome'],
+        'sheet_raw': 'RAW_vDatastore',
+    },
+    'vsnapshot': {
+        'destino': 'Snapshots',
+        'resultado': 'snapshots',
+        'mapa': _COLS_SNAP,
+        'obrigatorios': ['vm', 'snap_nome'],
+        'sheet_raw': 'RAW_vSnapshot',
+    },
+    'vtools': {
+        'destino': 'VMware_Tools',
+        'resultado': 'tools',
+        'mapa': _COLS_TOOLS,
+        'obrigatorios': ['vm'],
+        'sheet_raw': 'RAW_vTools',
+    },
+    'vcd': {
+        'destino': 'ISOs_Montadas',
+        'resultado': 'isos',
+        'mapa': _COLS_CD,
+        'obrigatorios': ['vm', 'iso_path'],
+        'sheet_raw': 'RAW_vCD',
+    },
+    'vmetadata': {
+        'destino': 'Build_vCenter',
+        'resultado': 'vc_build',
+        'mapa': _COLS_META,
+        'obrigatorios': ['chave', 'valor'],
+        'sheet_raw': 'RAW_vMetadata',
+    },
+    'vsource': {
+        'destino': 'Build_vCenter',
+        'resultado': 'vc_build',
+        'mapa': _COLS_META,
+        'obrigatorios': ['chave', 'valor'],
+        'sheet_raw': 'RAW_vSource',
+    },
+    'vhealth': {
+        'destino': 'Build_vCenter',
+        'resultado': 'vc_build',
+        'mapa': _COLS_META,
+        'obrigatorios': ['chave', 'valor'],
+        'sheet_raw': 'RAW_vHealth',
+    },
+}
+
+
+def _status_diagnostico_importacao(linhas_lidas: int, linhas_extraidas: int,
+                                   obrigatorios_faltando: list, reconhecida: bool) -> str:
+    """Calcula o status de uma fonte importada."""
+    if not reconhecida:
+        return 'SEM_EXTRAÇÃO'
+    if linhas_lidas == 0:
+        return 'VAZIA'
+    if obrigatorios_faltando:
+        return 'MAPEAMENTO_PARCIAL'
+    if linhas_extraidas > 0:
+        return 'OK'
+    return 'SEM_DADOS'
+
+
+def construir_diagnostico_importacao(abas: dict, metadados_abas: dict, dados: dict) -> tuple[list, list]:
+    """Consolida o diagnóstico de importação e as abas brutas a preservar no XLSX."""
+    diagnostico = []
+    abas_brutas = []
+    preservadas = set()
+
+    for aba, cfg in _CONFIG_IMPORTACAO.items():
+        meta = metadados_abas.get(aba)
+        if meta is None:
+            diagnostico.append({
+                'arquivo': 'N/D',
+                'aba': aba,
+                'destino': cfg['destino'],
+                'linhas_lidas': 0,
+                'linhas_extraidas': 0,
+                'status': 'AUSENTE',
+                'avisos': [f"Nenhum arquivo correspondente à aba {aba} foi encontrado."],
+                'colunas': [],
+            })
+            continue
+
+        df = abas.get(aba, pd.DataFrame())
+        cols = _mapear_colunas(df, cfg['mapa']) if not df.empty else {}
+        obrigatorios_faltando = [
+            campo for campo in cfg.get('obrigatorios', [])
+            if not cols.get(campo)
+        ]
+        resultado = dados.get(cfg['resultado'])
+        if cfg['resultado'] == 'vc_build':
+            linhas_extraidas = 1 if dados.get('vc_build', {}).get('fonte') == aba else 0
+        else:
+            linhas_extraidas = len(resultado or [])
+        status = _status_diagnostico_importacao(
+            meta['linhas_lidas'], linhas_extraidas, obrigatorios_faltando, True
+        )
+        avisos = list(meta.get('avisos', []))
+        if obrigatorios_faltando:
+            avisos.append(
+                "Campos obrigatórios não reconhecidos: " +
+                ', '.join(sorted(obrigatorios_faltando))
+            )
+        elif meta['linhas_lidas'] > 0 and linhas_extraidas == 0:
+            if cfg['resultado'] == 'vc_build':
+                avisos.append('A aba foi carregada, mas não forneceu versão/build utilizável para o vCenter.')
+            else:
+                avisos.append('A aba foi carregada, mas nenhuma linha especializada pôde ser extraída.')
+
+        diagnostico.append({
+            'arquivo': meta['arquivo'],
+            'aba': aba,
+            'destino': cfg['destino'],
+            'linhas_lidas': meta['linhas_lidas'],
+            'linhas_extraidas': linhas_extraidas,
+            'status': status,
+            'avisos': avisos,
+            'colunas': meta.get('colunas', []),
+        })
+
+        if status in ('MAPEAMENTO_PARCIAL', 'SEM_DADOS') and not df.empty:
+            abas_brutas.append({'nome': cfg['sheet_raw'], 'df': df})
+            preservadas.add(aba)
+
+    for aba, meta in metadados_abas.items():
+        if aba in _CONFIG_IMPORTACAO or aba in preservadas:
+            continue
+        df = abas.get(aba, pd.DataFrame())
+        diagnostico.append({
+            'arquivo': meta['arquivo'],
+            'aba': aba,
+            'destino': 'Sem extração especializada',
+            'linhas_lidas': meta['linhas_lidas'],
+            'linhas_extraidas': 0,
+            'status': 'SEM_EXTRAÇÃO',
+            'avisos': ['Aba preservada em formato bruto para análise manual.'],
+            'colunas': meta.get('colunas', []),
+        })
+        if not df.empty:
+            abas_brutas.append({'nome': f"RAW_{aba}", 'df': df})
+
+    ordem_status = {
+        'MAPEAMENTO_PARCIAL': 0,
+        'SEM_DADOS': 1,
+        'SEM_EXTRAÇÃO': 2,
+        'VAZIA': 3,
+        'AUSENTE': 4,
+        'OK': 5,
+    }
+    diagnostico.sort(key=lambda item: (ordem_status.get(item['status'], 99), item['aba']))
+    return diagnostico, abas_brutas
+
 
 def _mapear_colunas(df: pd.DataFrame, mapa: dict) -> dict:
     """Mapeia candidatos para colunas reais do DataFrame."""
@@ -683,6 +1000,14 @@ def _mapear_colunas(df: pd.DataFrame, mapa: dict) -> dict:
         campo: encontrar_coluna(list(df.columns), candidatos)
         for campo, candidatos in mapa.items()
     }
+
+
+def _linha_tem_valores(row, colunas: list[str | None]) -> bool:
+    """Indica se a linha possui pelo menos um valor útil nas colunas informadas."""
+    for coluna in colunas:
+        if col_val(row, coluna):
+            return True
+    return False
 
 
 def extrair_hosts(abas: dict) -> list:
@@ -694,7 +1019,7 @@ def extrair_hosts(abas: dict) -> list:
     cols = _mapear_colunas(df, _COLS_HOST)
     hosts = []
     for _, row in df.iterrows():
-        hosts.append({
+        host = {
             'nome':       col_val(row, cols['nome']),
             'cluster':    col_val(row, cols['cluster']),
             'versao':     col_val(row, cols['versao']),
@@ -706,7 +1031,10 @@ def extrair_hosts(abas: dict) -> list:
             'vcenter':    col_val(row, cols['vcenter']),
             'modelo':     col_val(row, cols['modelo']),
             'fabricante': col_val(row, cols['fabricante']),
-        })
+        }
+        if host['nome'] or _linha_tem_valores(row, list(cols.values())):
+            if host['nome']:
+                hosts.append(host)
     return hosts
 
 
@@ -719,7 +1047,7 @@ def extrair_vms(abas: dict) -> list:
     cols = _mapear_colunas(df, _COLS_VM)
     vms = []
     for _, row in df.iterrows():
-        vms.append({
+        vm = {
             'nome':          col_val(row, cols['nome']),
             'power':         col_val(row, cols['power']),
             'template':      col_val(row, cols['template']),
@@ -732,8 +1060,11 @@ def extrair_vms(abas: dict) -> list:
             'os':            col_val(row, cols['os']),
             'tools_status':  col_val(row, cols['tools_status']),
             'tools_version': col_val(row, cols['tools_version']),
+            'iso_path':      col_val(row, cols['iso']),
             'folder':        col_val(row, cols['folder']),
-        })
+        }
+        if vm['nome']:
+            vms.append(vm)
     return vms
 
 
@@ -1241,6 +1572,32 @@ def gerar_xlsx(dados: dict, caminho: str):
     # Remover aba padrão
     wb.remove(wb.active)
 
+    diagnostico = dados.get('importacao', [])
+    headers_diag = ['Arquivo', 'Aba', 'Destino', 'Linhas Lidas',
+                    'Linhas Extraídas', 'Status', 'Avisos', 'Colunas Encontradas']
+    linhas_diag = []
+    cor_diag = {
+        'OK': 'OK',
+        'AUSENTE': 'DESCONHECIDO',
+        'VAZIA': 'DESCONHECIDO',
+        'MAPEAMENTO_PARCIAL': 'WARNING',
+        'SEM_DADOS': 'INFO',
+        'SEM_EXTRAÇÃO': 'INFO',
+    }
+    for item in diagnostico:
+        linhas_diag.append({
+            '_status': cor_diag.get(item.get('status'), 'DESCONHECIDO'),
+            'Arquivo': item.get('arquivo', 'N/D'),
+            'Aba': item.get('aba', ''),
+            'Destino': item.get('destino', ''),
+            'Linhas Lidas': item.get('linhas_lidas', 0),
+            'Linhas Extraídas': item.get('linhas_extraidas', 0),
+            'Status': item.get('status', ''),
+            'Avisos': ' | '.join(item.get('avisos', [])),
+            'Colunas Encontradas': ', '.join(item.get('colunas', [])),
+        })
+    _escrever_aba_xlsx(wb, 'Diagnostico_Importacao', headers_diag, linhas_diag)
+
     # --- Aba: Inventario_VMs ---
     vms = dados.get('vms', [])
     if vms:
@@ -1430,6 +1787,11 @@ def gerar_xlsx(dados: dict, caminho: str):
             })
         _escrever_aba_xlsx(wb, 'Achados_Criticos', headers_ac, linhas)
 
+    for aba_raw in dados.get('abas_brutas', []):
+        df = aba_raw.get('df', pd.DataFrame())
+        if not df.empty:
+            _escrever_dataframe_xlsx(wb, aba_raw.get('nome', 'RAW_Dados'), df)
+
     wb.save(caminho)
     print(f"XLSX gerado: {caminho}")
 
@@ -1497,6 +1859,55 @@ def _capa_docx(doc, dados: dict):
     doc.add_page_break()
 
 
+def _diag_importacao_por_aba(dados: dict, aba: str) -> dict | None:
+    """Retorna o diagnóstico consolidado para uma aba específica."""
+    for item in dados.get('importacao', []):
+        if item.get('aba') == aba:
+            return item
+    return None
+
+
+def _adicionar_estado_fonte_docx(doc, dados: dict, aba: str, nome_exibicao: str):
+    """Descreve no DOCX o estado de importação de uma fonte quando não há dados extraídos."""
+    diag = _diag_importacao_por_aba(dados, aba)
+    if not diag:
+        adicionar_paragrafo(
+            doc,
+            f"Fonte {nome_exibicao} ausente; nenhum arquivo RVTools correspondente foi encontrado.",
+            tamanho=10, cor=CORES['DESCONHECIDO']
+        )
+        return
+
+    status = diag.get('status', 'DESCONHECIDO')
+    arquivo = diag.get('arquivo', 'N/D')
+    linhas = diag.get('linhas_lidas', 0)
+    colunas = ', '.join(diag.get('colunas', [])) or 'Nenhuma'
+    avisos = diag.get('avisos', [])
+
+    if status == 'AUSENTE':
+        msg = f"Fonte {nome_exibicao} ausente; nenhum arquivo correspondente à aba {aba} foi encontrado."
+    elif status == 'VAZIA':
+        msg = f"Fonte {nome_exibicao} carregada a partir de {arquivo}, porém sem linhas válidas."
+    elif status == 'MAPEAMENTO_PARCIAL':
+        msg = (
+            f"Fonte {nome_exibicao} carregada a partir de {arquivo} com {linhas} linha(s), "
+            "mas a extração especializada falhou por colunas não reconhecidas."
+        )
+    elif status == 'SEM_DADOS':
+        msg = (
+            f"Fonte {nome_exibicao} carregada a partir de {arquivo} com {linhas} linha(s), "
+            "porém nenhuma linha especializada pôde ser preservada nesta seção."
+        )
+    else:
+        msg = f"Fonte {nome_exibicao}: status {status}."
+
+    cor = CORES['WARNING'] if status in ('MAPEAMENTO_PARCIAL', 'SEM_DADOS') else CORES['DESCONHECIDO']
+    adicionar_paragrafo(doc, msg, tamanho=10, cor=cor)
+    adicionar_paragrafo(doc, f"Colunas encontradas: {colunas}", tamanho=9, cor=RGBColor(0x66, 0x66, 0x66))
+    for aviso in avisos:
+        adicionar_paragrafo(doc, f"- {aviso}", tamanho=9, cor=cor)
+
+
 def _sumario_executivo_docx(doc, dados: dict):
     """Seção 1 — Sumário executivo."""
     doc.add_heading('1. Sumário Executivo', level=1)
@@ -1554,14 +1965,14 @@ def _sumario_executivo_docx(doc, dados: dict):
     doc.add_paragraph()
 
 
-def _secao_inventario_docx(doc, vms: list):
+def _secao_inventario_docx(doc, dados: dict):
     """Seção 2 — Inventário de VMs."""
+    vms = dados.get('vms', [])
     doc.add_heading('2. Inventário de VMs', level=1)
     adicionar_paragrafo(doc, f"Total de {len(vms)} VMs/templates no inventário.", tamanho=10)
 
     if not vms:
-        adicionar_paragrafo(doc, 'Nenhuma VM encontrada (aba vInfo ausente ou vazia).',
-                            tamanho=10, cor=CORES['DESCONHECIDO'])
+        _adicionar_estado_fonte_docx(doc, dados, 'vinfo', 'vInfo')
         return
 
     poweron = sum(1 for v in vms if v.get('power', '').lower() in
@@ -1595,12 +2006,12 @@ def _secao_inventario_docx(doc, vms: list):
     doc.add_paragraph()
 
 
-def _secao_hosts_docx(doc, hosts: list):
+def _secao_hosts_docx(doc, dados: dict):
     """Seção 3 — Análise de Hosts."""
+    hosts = dados.get('hosts', [])
     doc.add_heading('3. Análise de Hosts', level=1)
     if not hosts:
-        adicionar_paragrafo(doc, 'Nenhum host encontrado (aba vHost ausente ou vazia).',
-                            tamanho=10, cor=CORES['DESCONHECIDO'])
+        _adicionar_estado_fonte_docx(doc, dados, 'vhost', 'vHost')
         return
 
     adicionar_paragrafo(doc, f"{len(hosts)} hosts ESXi encontrados.", tamanho=10)
@@ -1776,12 +2187,12 @@ def _secao_vcenter_build_docx(doc, vc_build: dict, catalogo: dict):
     doc.add_paragraph()
 
 
-def _secao_clusters_docx(doc, clusters_oc: list):
+def _secao_clusters_docx(doc, dados: dict):
     """Seção 6 — Clusters e Overcommit."""
+    clusters_oc = dados.get('clusters_oc', [])
     doc.add_heading('6. Clusters e Overcommit de Recursos', level=1)
     if not clusters_oc:
-        adicionar_paragrafo(doc, 'Nenhum cluster encontrado (aba vCluster ausente ou vazia).',
-                            tamanho=10, cor=CORES['DESCONHECIDO'])
+        _adicionar_estado_fonte_docx(doc, dados, 'vcluster', 'vCluster')
         return
 
     adicionar_paragrafo(doc,
@@ -1819,12 +2230,12 @@ def _secao_clusters_docx(doc, clusters_oc: list):
     doc.add_paragraph()
 
 
-def _secao_datastores_docx(doc, datastores: list):
+def _secao_datastores_docx(doc, dados: dict):
     """Seção 7 — Datastores."""
+    datastores = dados.get('datastores', [])
     doc.add_heading('7. Datastores', level=1)
     if not datastores:
-        adicionar_paragrafo(doc, 'Nenhum datastore encontrado (aba vDatastore ausente).',
-                            tamanho=10, cor=CORES['DESCONHECIDO'])
+        _adicionar_estado_fonte_docx(doc, dados, 'vdatastore', 'vDatastore')
         return
 
     adicionar_paragrafo(doc,
@@ -1863,12 +2274,12 @@ def _secao_datastores_docx(doc, datastores: list):
     doc.add_paragraph()
 
 
-def _secao_snapshots_docx(doc, snapshots: list):
+def _secao_snapshots_docx(doc, dados: dict):
     """Seção 8 — Snapshots."""
+    snapshots = dados.get('snapshots', [])
     doc.add_heading('8. Snapshots', level=1)
     if not snapshots:
-        adicionar_paragrafo(doc, 'Nenhum snapshot encontrado.',
-                            tamanho=10, cor=CORES['OK'], negrito=True)
+        _adicionar_estado_fonte_docx(doc, dados, 'vsnapshot', 'vSnapshot')
         return
 
     adicionar_paragrafo(doc,
@@ -1900,12 +2311,12 @@ def _secao_snapshots_docx(doc, snapshots: list):
     doc.add_paragraph()
 
 
-def _secao_tools_docx(doc, tools: list):
+def _secao_tools_docx(doc, dados: dict):
     """Seção 9 — VMware Tools."""
+    tools = dados.get('tools', [])
     doc.add_heading('9. VMware Tools', level=1)
     if not tools:
-        adicionar_paragrafo(doc, 'Nenhum dado de VMware Tools encontrado (aba vTools ausente).',
-                            tamanho=10, cor=CORES['DESCONHECIDO'])
+        _adicionar_estado_fonte_docx(doc, dados, 'vtools', 'vTools')
         return
 
     problemas = [t for t in tools
@@ -2045,9 +2456,72 @@ def _secao_achados_docx(doc, achados: list):
     doc.add_paragraph()
 
 
+def _secao_diagnostico_importacao_docx(doc, dados: dict):
+    """Seção 13 — Diagnóstico de importação das abas RVTools."""
+    diagnostico = dados.get('importacao', [])
+    doc.add_heading('13. Diagnóstico de Importação RVTools', level=1)
+    if not diagnostico:
+        adicionar_paragrafo(doc, 'Nenhum diagnóstico de importação disponível.', tamanho=10)
+        return
+
+    headers = ['Arquivo', 'Aba', 'Destino', 'Lidas', 'Extraídas', 'Status']
+    tab = doc.add_table(rows=len(diagnostico) + 1, cols=len(headers), style='Table Grid')
+    definir_bordas_tabela(tab)
+    for i, header in enumerate(headers):
+        tab.rows[0].cells[i].text = header
+    formatar_header_tabela(tab.rows[0], len(headers))
+
+    cores_status = {
+        'OK': 'OK',
+        'AUSENTE': 'DESCONHECIDO',
+        'VAZIA': 'DESCONHECIDO',
+        'MAPEAMENTO_PARCIAL': 'WARNING',
+        'SEM_DADOS': 'INFO',
+        'SEM_EXTRAÇÃO': 'INFO',
+    }
+    for idx, item in enumerate(diagnostico):
+        row = tab.rows[idx + 1]
+        vals = [
+            item.get('arquivo', 'N/D'),
+            item.get('aba', ''),
+            item.get('destino', ''),
+            str(item.get('linhas_lidas', 0)),
+            str(item.get('linhas_extraidas', 0)),
+        ]
+        for j, val in enumerate(vals):
+            row.cells[j].text = val
+            for p in row.cells[j].paragraphs:
+                for run in p.runs:
+                    run.font.size = Pt(8)
+        adicionar_celula_status(row.cells[len(headers) - 1], item.get('status', 'DESCONHECIDO'), 8)
+        st = cores_status.get(item.get('status'))
+        if st in CORES_BG and st != 'OK':
+            for c in row.cells[:len(headers) - 1]:
+                definir_cor_celula(c, CORES_BG[st])
+        elif idx % 2:
+            for c in row.cells[:len(headers) - 1]:
+                definir_cor_celula(c, COR_LINHA_ALTERNADA)
+
+    doc.add_paragraph()
+    for item in diagnostico:
+        if item.get('status') == 'OK':
+            continue
+        adicionar_paragrafo(
+            doc,
+            f"{item.get('aba', '')} / {item.get('arquivo', 'N/D')}: "
+            f"{' | '.join(item.get('avisos', [])) or 'Sem avisos adicionais.'}",
+            tamanho=9, cor=CORES['WARNING'] if item.get('status') in ('MAPEAMENTO_PARCIAL', 'SEM_DADOS') else CORES['DESCONHECIDO']
+        )
+        adicionar_paragrafo(
+            doc,
+            f"Colunas encontradas: {', '.join(item.get('colunas', [])) or 'Nenhuma'}",
+            tamanho=9, cor=RGBColor(0x66, 0x66, 0x66)
+        )
+
+
 def _secao_boas_praticas_docx(doc):
-    """Seção 13 — Boas Práticas e Recomendações."""
-    doc.add_heading('13. Boas Práticas e Recomendações', level=1)
+    """Seção 14 — Boas Práticas e Recomendações."""
+    doc.add_heading('14. Boas Práticas e Recomendações', level=1)
 
     praticas = [
         ('Builds e Atualizações',
@@ -2100,28 +2574,30 @@ def gerar_docx(dados: dict, catalogo: dict, caminho: str):
     # Seções
     _sumario_executivo_docx(doc, dados)
     doc.add_page_break()
-    _secao_inventario_docx(doc, dados.get('vms', []))
+    _secao_inventario_docx(doc, dados)
     doc.add_page_break()
-    _secao_hosts_docx(doc, dados.get('hosts', []))
+    _secao_hosts_docx(doc, dados)
     doc.add_page_break()
     _secao_builds_esxi_docx(doc, dados.get('builds_hosts', []),
                              dados.get('conformidade_builds', []), catalogo)
     doc.add_page_break()
     _secao_vcenter_build_docx(doc, dados.get('vc_build', {}), catalogo)
     doc.add_page_break()
-    _secao_clusters_docx(doc, dados.get('clusters_oc', []))
+    _secao_clusters_docx(doc, dados)
     doc.add_page_break()
-    _secao_datastores_docx(doc, dados.get('datastores', []))
+    _secao_datastores_docx(doc, dados)
     doc.add_page_break()
-    _secao_snapshots_docx(doc, dados.get('snapshots', []))
+    _secao_snapshots_docx(doc, dados)
     doc.add_page_break()
-    _secao_tools_docx(doc, dados.get('tools', []))
+    _secao_tools_docx(doc, dados)
     doc.add_page_break()
     _secao_hw_versions_docx(doc, dados.get('hw_versions', []))
     doc.add_page_break()
     _secao_isos_docx(doc, dados.get('isos', []))
     doc.add_page_break()
     _secao_achados_docx(doc, dados.get('achados', []))
+    doc.add_page_break()
+    _secao_diagnostico_importacao_docx(doc, dados)
     doc.add_page_break()
     _secao_boas_praticas_docx(doc)
 
@@ -2154,7 +2630,7 @@ def main():
 
     # 2. Carregar abas RVTools
     print("\n[2/6] Carregando arquivos RVTools_tab*.csv...")
-    abas = carregar_abas(diretorio)
+    abas, metadados_abas = carregar_abas(diretorio, retornar_metadados=True)
     if not abas:
         print("\nERRO: Nenhuma aba carregada. Verifique se os CSVs estão no diretório correto.")
         sys.exit(1)
@@ -2186,6 +2662,19 @@ def main():
         hosts, builds_hosts, clusters_oc, datastores,
         snapshots, tools, vc_build
     )
+    diagnostico_importacao, abas_brutas = construir_diagnostico_importacao(
+        abas, metadados_abas,
+        {
+           'hosts': hosts,
+           'vms': vms_raw,
+           'clusters_oc': clusters_oc,
+           'datastores': datastores,
+           'snapshots': snapshots,
+           'tools': tools,
+           'isos': isos,
+           'vc_build': vc_build,
+        }
+    )
     print(f"      Achados: {len(achados)} "
           f"(Críticos: {sum(1 for a in achados if a['status']=='CRÍTICO')} | "
           f"Avisos: {sum(1 for a in achados if a['status']=='WARNING')})")
@@ -2205,6 +2694,8 @@ def main():
         'vc_build':           vc_build,
         'achados':            achados,
         'catalogo_revisao':   cat_revisao,
+        'importacao':         diagnostico_importacao,
+        'abas_brutas':        abas_brutas,
     }
 
     # 6. Gerar relatórios
