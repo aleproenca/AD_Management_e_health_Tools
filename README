@@ -1,6 +1,6 @@
 # AD Management & Health Tools 🛠️
 
-Este repositório contém um conjunto de ferramentas poderosas para administradores de sistemas focadas em auditoria, diagnóstico e visualização de ambientes **Active Directory** e **Group Policy (GPO)**.
+Este repositório contém um conjunto de ferramentas poderosas para administradores de sistemas focadas em auditoria, diagnóstico e visualização de ambientes **Active Directory**, **Group Policy (GPO)** e **VMware vSphere**.
 
 ## 📋 Conteúdo do Repositório
 
@@ -19,30 +19,72 @@ Automatização de relatórios executivos.
 * **O que faz:** Processa o CSV gerado pelo `HealthCheckAD` e converte-o num documento **Microsoft Word (.docx)** profissional.
 * **Destaque:** Inclui tabelas formatadas e gráficos estatísticos (Pizza) sobre a saúde do domínio.
 
+### 4. healthcheck_rvtools.py (Python) — Health Check VMware/RVTools
+Análise de ambientes VMware vSphere a partir das exportações do **RVTools**.
+* **O que faz:**
+  * Lê automaticamente todos os ficheiros `RVTools_tab*.csv` de um diretório.
+  * Valida os builds de **ESXi** e **vCenter** contra um catálogo estático com versões suportadas/recomendadas (sem consultas externas em tempo de execução).
+  * Analisa overcommit de CPU/memória, conformidade de builds por cluster, datastores críticos, snapshots antigos, VMware Tools desatualizados, versões de hardware e ISOs montadas.
+  * Gera um relatório executivo em **Word (.docx)** com 13 secções e uma planilha complementar **Excel (.xlsx)** com 12 abas e realce de status por cor.
+* **Pré-requisitos Python:**
+  ```bash
+  pip install pandas python-docx openpyxl
+  ```
+* **Ficheiros necessários:**
+  * `healthcheck_rvtools.py` — script principal
+  * `vmware_builds_catalog.json` — catálogo de builds (deve estar no mesmo diretório do script ou no diretório de execução)
+
 ---
 
 ## 🚀 Como Utilizar
 
 ### Pré-requisitos
 * **PowerShell:** Executar como Administrador num Domain Controller ou máquina com RSAT instalado.
-* **Python 3.x:** Para o gerador de relatórios Word.
-  bash
-    pip install python-docx matplotlib
-  
+* **Python 3.x:** Para os geradores de relatórios Word/Excel.
+  ```bash
+  # Para gerar_relatorio_ad.py:
+  pip install python-docx matplotlib
+
+  # Para healthcheck_rvtools.py:
+  pip install pandas python-docx openpyxl
+  ```
 
 ### Fluxo de Trabalho Sugerido
+
+#### Active Directory
 1.  **Executar o Diagnóstico:**
-   powershell
-    .\HealthCheckAD_Version2.ps1
-  
+  ```powershell
+  .\HealthCheckAD_Version2.ps1
+  ```
 2.  **Gerar o Relatório Executivo (Word):**
-   bash
-    python gerar_relatorio_ad.py HealthCheckAD_YYYYMMDD.csv
-  
+  ```bash
+  python gerar_relatorio_ad.py HealthCheckAD_YYYYMMDD.csv
+  ```
 3.  **Auditar GPOs:**
-  powershell
-    .\GPO_Dashboard_Version2.ps1
-   
+  ```powershell
+  .\GPO_Dashboard_Version2.ps1
+  ```
+
+#### VMware / RVTools
+1.  **Exportar dados com RVTools** — exporte todas as abas para CSV (opção *Export all* no menu File). Certifique-se de que os ficheiros seguem o padrão `RVTools_tab*.csv`.
+2.  **Executar o Health Check:**
+  ```bash
+  # Diretório com os CSVs passado como argumento (default: diretório atual)
+  python healthcheck_rvtools.py /caminho/para/csvs
+  ```
+3.  **Consultar os relatórios gerados:**
+  * `Relatorio_HealthCheck_RVTools.docx` — relatório executivo Word
+  * `Relatorio_HealthCheck_RVTools.xlsx` — planilha Excel com todas as abas de dados
+
+##### Executar testes unitários
+```bash
+python -m pytest tests/ -v
+```
+
+##### Atualizar o catálogo de builds
+O ficheiro `vmware_builds_catalog.json` contém os builds suportados/recomendados de ESXi e vCenter.
+Deve ser atualizado periodicamente contra a [VMware Product Lifecycle Matrix](https://lifecycle.vmware.com/) e a [KB de builds ESXi (KB2143832)](https://kb.vmware.com/s/article/2143832).
+O campo `_metadata.data_revisao` indica a data da última revisão do catálogo — atualize-o sempre que adicionar novos builds.
 
 ---
 

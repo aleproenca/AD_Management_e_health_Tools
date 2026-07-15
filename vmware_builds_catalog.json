@@ -1,0 +1,459 @@
+{
+  "_metadata": {
+    "descricao": "Catálogo estático de builds ESXi e vCenter Server suportados/recomendados pela Broadcom/VMware.",
+    "data_revisao": "2025-01",
+    "fonte_oficial": "https://kb.vmware.com/s/article/2143832 | https://brcmlink.broadcom.com/vcf-lifecycle",
+    "aviso": "Este catálogo NÃO é atualizado automaticamente. Revise periodicamente contra a matriz oficial Broadcom/VMware (KB 2143832 e páginas de ciclo de vida). Builds listados são os mais relevantes; podem existir patches intermediários não listados.",
+    "status_lifecycle": {
+      "Suportado":      "Versão com suporte ativo pela Broadcom/VMware.",
+      "EOS":            "End of Support – sem novos patches de segurança/bug; migração recomendada.",
+      "EOL":            "End of Life – sem qualquer suporte. Versão deve ser atualizada imediatamente.",
+      "Desconhecido":   "Status de suporte não mapeado neste catálogo."
+    }
+  },
+  "esxi": [
+    {
+      "versao_linha": "6.5",
+      "versao_completa": "ESXi 6.5 U3t (última conhecida)",
+      "build": 19193900,
+      "data_release": "2022-06-14",
+      "lifecycle_status": "EOL",
+      "is_recommended": true,
+      "observacao": "EOL desde 15/10/2022. Atualização imediata necessária."
+    },
+    {
+      "versao_linha": "6.7",
+      "versao_completa": "ESXi 6.7 U3o (última conhecida)",
+      "build": 21424296,
+      "data_release": "2023-02-21",
+      "lifecycle_status": "EOL",
+      "is_recommended": true,
+      "observacao": "EOL desde 15/10/2022. Atualização imediata necessária."
+    },
+    {
+      "versao_linha": "7.0",
+      "versao_completa": "ESXi 7.0 GA",
+      "build": 15843807,
+      "data_release": "2020-04-02",
+      "lifecycle_status": "EOS",
+      "is_recommended": false,
+      "observacao": "Versão base 7.0. Atualize para o patch mais recente da linha 7.0."
+    },
+    {
+      "versao_linha": "7.0",
+      "versao_completa": "ESXi 7.0 U1",
+      "build": 17119627,
+      "data_release": "2020-10-06",
+      "lifecycle_status": "EOS",
+      "is_recommended": false,
+      "observacao": "Update 1 linha 7.0."
+    },
+    {
+      "versao_linha": "7.0",
+      "versao_completa": "ESXi 7.0 U2",
+      "build": 17630552,
+      "data_release": "2021-03-09",
+      "lifecycle_status": "EOS",
+      "is_recommended": false,
+      "observacao": "Update 2 linha 7.0."
+    },
+    {
+      "versao_linha": "7.0",
+      "versao_completa": "ESXi 7.0 U2a",
+      "build": 17867351,
+      "data_release": "2021-05-25",
+      "lifecycle_status": "EOS",
+      "is_recommended": false,
+      "observacao": "Update 2a linha 7.0."
+    },
+    {
+      "versao_linha": "7.0",
+      "versao_completa": "ESXi 7.0 U2c",
+      "build": 18426014,
+      "data_release": "2021-09-16",
+      "lifecycle_status": "EOS",
+      "is_recommended": false,
+      "observacao": "Update 2c linha 7.0."
+    },
+    {
+      "versao_linha": "7.0",
+      "versao_completa": "ESXi 7.0 U3",
+      "build": 18644231,
+      "data_release": "2021-10-05",
+      "lifecycle_status": "EOS",
+      "is_recommended": false,
+      "observacao": "Update 3 linha 7.0."
+    },
+    {
+      "versao_linha": "7.0",
+      "versao_completa": "ESXi 7.0 U3c",
+      "build": 19193900,
+      "data_release": "2022-02-15",
+      "lifecycle_status": "EOS",
+      "is_recommended": false,
+      "observacao": "Update 3c linha 7.0."
+    },
+    {
+      "versao_linha": "7.0",
+      "versao_completa": "ESXi 7.0 U3d",
+      "build": 19482537,
+      "data_release": "2022-06-14",
+      "lifecycle_status": "EOS",
+      "is_recommended": false,
+      "observacao": "Update 3d linha 7.0."
+    },
+    {
+      "versao_linha": "7.0",
+      "versao_completa": "ESXi 7.0 U3g",
+      "build": 21003263,
+      "data_release": "2022-12-08",
+      "lifecycle_status": "EOS",
+      "is_recommended": false,
+      "observacao": "Update 3g linha 7.0."
+    },
+    {
+      "versao_linha": "7.0",
+      "versao_completa": "ESXi 7.0 U3i",
+      "build": 21686933,
+      "data_release": "2023-03-30",
+      "lifecycle_status": "EOS",
+      "is_recommended": false,
+      "observacao": "Update 3i linha 7.0."
+    },
+    {
+      "versao_linha": "7.0",
+      "versao_completa": "ESXi 7.0 U3j",
+      "build": 21997511,
+      "data_release": "2023-07-13",
+      "lifecycle_status": "EOS",
+      "is_recommended": false,
+      "observacao": "Update 3j linha 7.0."
+    },
+    {
+      "versao_linha": "7.0",
+      "versao_completa": "ESXi 7.0 U3k",
+      "build": 22348816,
+      "data_release": "2023-09-21",
+      "lifecycle_status": "EOS",
+      "is_recommended": false,
+      "observacao": "Update 3k linha 7.0."
+    },
+    {
+      "versao_linha": "7.0",
+      "versao_completa": "ESXi 7.0 U3n",
+      "build": 23307199,
+      "data_release": "2024-01-25",
+      "lifecycle_status": "EOS",
+      "is_recommended": false,
+      "observacao": "Update 3n linha 7.0."
+    },
+    {
+      "versao_linha": "7.0",
+      "versao_completa": "ESXi 7.0 U3o",
+      "build": 23794027,
+      "data_release": "2024-04-04",
+      "lifecycle_status": "EOS",
+      "is_recommended": false,
+      "observacao": "Update 3o linha 7.0."
+    },
+    {
+      "versao_linha": "7.0",
+      "versao_completa": "ESXi 7.0 U3p",
+      "build": 24585291,
+      "data_release": "2024-06-06",
+      "lifecycle_status": "EOS",
+      "is_recommended": true,
+      "observacao": "Último patch recomendado para linha 7.0 (EOS desde 02/01/2025). Migrar para 8.0."
+    },
+    {
+      "versao_linha": "8.0",
+      "versao_completa": "ESXi 8.0 GA",
+      "build": 20513097,
+      "data_release": "2022-10-11",
+      "lifecycle_status": "Suportado",
+      "is_recommended": false,
+      "observacao": "Versão base 8.0. Atualize para o patch mais recente da linha 8.0."
+    },
+    {
+      "versao_linha": "8.0",
+      "versao_completa": "ESXi 8.0 U1",
+      "build": 21495797,
+      "data_release": "2023-04-18",
+      "lifecycle_status": "Suportado",
+      "is_recommended": false,
+      "observacao": "Update 1 linha 8.0."
+    },
+    {
+      "versao_linha": "8.0",
+      "versao_completa": "ESXi 8.0 U1a",
+      "build": 21813344,
+      "data_release": "2023-05-30",
+      "lifecycle_status": "Suportado",
+      "is_recommended": false,
+      "observacao": "Update 1a linha 8.0."
+    },
+    {
+      "versao_linha": "8.0",
+      "versao_completa": "ESXi 8.0 U2",
+      "build": 22380479,
+      "data_release": "2023-09-21",
+      "lifecycle_status": "Suportado",
+      "is_recommended": false,
+      "observacao": "Update 2 linha 8.0."
+    },
+    {
+      "versao_linha": "8.0",
+      "versao_completa": "ESXi 8.0 U2a",
+      "build": 22553142,
+      "data_release": "2023-11-21",
+      "lifecycle_status": "Suportado",
+      "is_recommended": false,
+      "observacao": "Update 2a linha 8.0."
+    },
+    {
+      "versao_linha": "8.0",
+      "versao_completa": "ESXi 8.0 U2b",
+      "build": 23305546,
+      "data_release": "2024-01-25",
+      "lifecycle_status": "Suportado",
+      "is_recommended": false,
+      "observacao": "Update 2b linha 8.0."
+    },
+    {
+      "versao_linha": "8.0",
+      "versao_completa": "ESXi 8.0 U2c",
+      "build": 23825572,
+      "data_release": "2024-04-04",
+      "lifecycle_status": "Suportado",
+      "is_recommended": false,
+      "observacao": "Update 2c linha 8.0."
+    },
+    {
+      "versao_linha": "8.0",
+      "versao_completa": "ESXi 8.0 U3",
+      "build": 24022510,
+      "data_release": "2024-08-20",
+      "lifecycle_status": "Suportado",
+      "is_recommended": false,
+      "observacao": "Update 3 linha 8.0."
+    },
+    {
+      "versao_linha": "8.0",
+      "versao_completa": "ESXi 8.0 U3b",
+      "build": 24280767,
+      "data_release": "2024-10-03",
+      "lifecycle_status": "Suportado",
+      "is_recommended": false,
+      "observacao": "Update 3b linha 8.0."
+    },
+    {
+      "versao_linha": "8.0",
+      "versao_completa": "ESXi 8.0 U3c",
+      "build": 24585291,
+      "data_release": "2024-12-12",
+      "lifecycle_status": "Suportado",
+      "is_recommended": false,
+      "observacao": "Update 3c linha 8.0."
+    },
+    {
+      "versao_linha": "8.0",
+      "versao_completa": "ESXi 8.0 U3d",
+      "build": 25055201,
+      "data_release": "2025-03-20",
+      "lifecycle_status": "Suportado",
+      "is_recommended": true,
+      "observacao": "Patch recomendado mais recente para linha 8.0 (conforme revisão do catálogo). Verifique a KB Broadcom para patches mais novos."
+    }
+  ],
+  "vcenter": [
+    {
+      "versao_linha": "6.5",
+      "versao_completa": "vCenter 6.5 U3t (última conhecida)",
+      "build": 19311113,
+      "data_release": "2022-06-14",
+      "lifecycle_status": "EOL",
+      "is_recommended": true,
+      "observacao": "EOL desde 15/10/2022. Atualização imediata necessária."
+    },
+    {
+      "versao_linha": "6.7",
+      "versao_completa": "vCenter 6.7 U3q (última conhecida)",
+      "build": 21352587,
+      "data_release": "2023-02-21",
+      "lifecycle_status": "EOL",
+      "is_recommended": true,
+      "observacao": "EOL desde 15/10/2022. Atualização imediata necessária."
+    },
+    {
+      "versao_linha": "7.0",
+      "versao_completa": "vCenter 7.0 GA",
+      "build": 15952498,
+      "data_release": "2020-04-02",
+      "lifecycle_status": "EOS",
+      "is_recommended": false,
+      "observacao": "Versão base 7.0."
+    },
+    {
+      "versao_linha": "7.0",
+      "versao_completa": "vCenter 7.0 U1",
+      "build": 17327517,
+      "data_release": "2020-10-06",
+      "lifecycle_status": "EOS",
+      "is_recommended": false,
+      "observacao": "Update 1 linha 7.0."
+    },
+    {
+      "versao_linha": "7.0",
+      "versao_completa": "vCenter 7.0 U2",
+      "build": 17694817,
+      "data_release": "2021-03-09",
+      "lifecycle_status": "EOS",
+      "is_recommended": false,
+      "observacao": "Update 2 linha 7.0."
+    },
+    {
+      "versao_linha": "7.0",
+      "versao_completa": "vCenter 7.0 U3",
+      "build": 18700403,
+      "data_release": "2021-10-05",
+      "lifecycle_status": "EOS",
+      "is_recommended": false,
+      "observacao": "Update 3 linha 7.0."
+    },
+    {
+      "versao_linha": "7.0",
+      "versao_completa": "vCenter 7.0 U3g",
+      "build": 21069789,
+      "data_release": "2022-12-08",
+      "lifecycle_status": "EOS",
+      "is_recommended": false,
+      "observacao": "Update 3g linha 7.0."
+    },
+    {
+      "versao_linha": "7.0",
+      "versao_completa": "vCenter 7.0 U3i",
+      "build": 21698906,
+      "data_release": "2023-03-30",
+      "lifecycle_status": "EOS",
+      "is_recommended": false,
+      "observacao": "Update 3i linha 7.0."
+    },
+    {
+      "versao_linha": "7.0",
+      "versao_completa": "vCenter 7.0 U3k",
+      "build": 22357613,
+      "data_release": "2023-09-21",
+      "lifecycle_status": "EOS",
+      "is_recommended": false,
+      "observacao": "Update 3k linha 7.0."
+    },
+    {
+      "versao_linha": "7.0",
+      "versao_completa": "vCenter 7.0 U3n",
+      "build": 23319993,
+      "data_release": "2024-01-25",
+      "lifecycle_status": "EOS",
+      "is_recommended": false,
+      "observacao": "Update 3n linha 7.0."
+    },
+    {
+      "versao_linha": "7.0",
+      "versao_completa": "vCenter 7.0 U3p",
+      "build": 24201990,
+      "data_release": "2024-08-20",
+      "lifecycle_status": "EOS",
+      "is_recommended": false,
+      "observacao": "Update 3p linha 7.0."
+    },
+    {
+      "versao_linha": "7.0",
+      "versao_completa": "vCenter 7.0 U3r",
+      "build": 24586946,
+      "data_release": "2024-12-12",
+      "lifecycle_status": "EOS",
+      "is_recommended": true,
+      "observacao": "Último patch recomendado para linha 7.0 (EOS desde 02/01/2025). Migrar para 8.0."
+    },
+    {
+      "versao_linha": "8.0",
+      "versao_completa": "vCenter 8.0 GA",
+      "build": 20519528,
+      "data_release": "2022-10-11",
+      "lifecycle_status": "Suportado",
+      "is_recommended": false,
+      "observacao": "Versão base 8.0."
+    },
+    {
+      "versao_linha": "8.0",
+      "versao_completa": "vCenter 8.0 U1",
+      "build": 21560480,
+      "data_release": "2023-04-18",
+      "lifecycle_status": "Suportado",
+      "is_recommended": false,
+      "observacao": "Update 1 linha 8.0."
+    },
+    {
+      "versao_linha": "8.0",
+      "versao_completa": "vCenter 8.0 U2",
+      "build": 22385739,
+      "data_release": "2023-09-21",
+      "lifecycle_status": "Suportado",
+      "is_recommended": false,
+      "observacao": "Update 2 linha 8.0."
+    },
+    {
+      "versao_linha": "8.0",
+      "versao_completa": "vCenter 8.0 U2b",
+      "build": 23319993,
+      "data_release": "2024-01-25",
+      "lifecycle_status": "Suportado",
+      "is_recommended": false,
+      "observacao": "Update 2b linha 8.0."
+    },
+    {
+      "versao_linha": "8.0",
+      "versao_completa": "vCenter 8.0 U2c",
+      "build": 23832836,
+      "data_release": "2024-04-04",
+      "lifecycle_status": "Suportado",
+      "is_recommended": false,
+      "observacao": "Update 2c linha 8.0."
+    },
+    {
+      "versao_linha": "8.0",
+      "versao_completa": "vCenter 8.0 U3",
+      "build": 24201990,
+      "data_release": "2024-08-20",
+      "lifecycle_status": "Suportado",
+      "is_recommended": false,
+      "observacao": "Update 3 linha 8.0."
+    },
+    {
+      "versao_linha": "8.0",
+      "versao_completa": "vCenter 8.0 U3b",
+      "build": 24322831,
+      "data_release": "2024-10-03",
+      "lifecycle_status": "Suportado",
+      "is_recommended": false,
+      "observacao": "Update 3b linha 8.0."
+    },
+    {
+      "versao_linha": "8.0",
+      "versao_completa": "vCenter 8.0 U3c",
+      "build": 24586946,
+      "data_release": "2024-12-12",
+      "lifecycle_status": "Suportado",
+      "is_recommended": false,
+      "observacao": "Update 3c linha 8.0."
+    },
+    {
+      "versao_linha": "8.0",
+      "versao_completa": "vCenter 8.0 U3d",
+      "build": 25088986,
+      "data_release": "2025-03-20",
+      "lifecycle_status": "Suportado",
+      "is_recommended": true,
+      "observacao": "Patch recomendado mais recente para linha 8.0 (conforme revisão do catálogo). Verifique a KB Broadcom para patches mais novos."
+    }
+  ]
+}
