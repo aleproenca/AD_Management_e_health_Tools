@@ -19,6 +19,12 @@ Automatização de relatórios executivos.
 * **O que faz:** Processa o CSV gerado pelo `HealthCheckAD` e converte-o num documento **Microsoft Word (.docx)** profissional.
 * **Destaque:** Inclui tabelas formatadas e gráficos estatísticos (Pizza) sobre a saúde do domínio.
 
+### 4. Inventario_ADCS_CA.ps1 (PowerShell)
+Inventário reutilizável de uma Autoridade Certificadora Microsoft AD CS.
+* **O que faz:** Coleta informações do host, serviço `CertSvc`, configuração e certificado da CA, templates publicados, CAs corporativas no Active Directory, cadeia de certificados, eventos recentes e verificações básicas de saúde.
+* **Output:** Gera **CSV** tabular e **HTML** com resumo de saúde, seções por categoria e limitações/avisos da coleta.
+* **Requisitos:** Windows PowerShell 5.1, execução preferencialmente elevada no servidor de CA. Para coleta remota, requer **WinRM** e permissões administrativas apropriadas. Detecta `certutil` apenas quando disponível.
+
 ---
 
 ## 🚀 Como Utilizar
@@ -42,6 +48,18 @@ Automatização de relatórios executivos.
 3.  **Auditar GPOs:**
   powershell
     .\GPO_Dashboard_Version2.ps1
+
+4. **Inventariar uma CA AD CS:**
+  powershell
+    .\Inventario_ADCS_CA.ps1
+
+5. **Inventariar uma CA remota e gravar noutra pasta:**
+  powershell
+    .\Inventario_ADCS_CA.ps1 -ServidorCA CA01 -DiretorioSaida C:\Relatorios\ADCS
+
+6. **Gerar apenas CSV com menos eventos recentes:**
+  powershell
+    .\Inventario_ADCS_CA.ps1 -SemHtml -LimiteEventos 25
    
 
 ---
